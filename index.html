@@ -422,39 +422,58 @@ function layoutAll(){
   });
 }
 
-/* ---------- ドラッグ＆タップ ---------- */
+/* ---------- ドラッグ＆タップ ----------
+   iPad(iOS Safari)対策：要素のポインタキャプチャに頼らず、
+   ドラッグ中は document 全体で move/up/cancel を受け取る。
+   これで途中でキャプチャが外れても必ずドロップが解決され、
+   ピースが宙に浮いたまま消える不具合を防ぐ。 */
+const TH=8;
+let drag=null; // {p, el, pid, startX, startY, offX, offY, moved, dragging}
+
+function onDocMove(e){
+  if(!drag || e.pointerId!==drag.pid) return;
+  const dx=e.clientX-drag.startX, dy=e.clientY-drag.startY;
+  if(!drag.moved && Math.hypot(dx,dy)>TH) drag.moved=true;
+  if(drag.moved && !drag.p.placed){
+    if(!drag.dragging){ drag.dragging=true; drag.el.classList.add('dragging');
+      drag.el.style.width=G.cellPx+'px'; drag.el.style.height=G.cellPx+'px'; drag.el.style.margin='0'; }
+    drag.el.style.left=(e.clientX-drag.offX)+'px'; drag.el.style.top=(e.clientY-drag.offY)+'px';
+    if(e.cancelable) e.preventDefault();
+  }
+}
+function endDrag(e,cancelled){
+  if(!drag) return;
+  const d=drag; drag=null;
+  document.removeEventListener('pointermove',onDocMove);
+  document.removeEventListener('pointerup',onDocUp);
+  document.removeEventListener('pointercancel',onDocCancel);
+  try{ d.el.releasePointerCapture(d.pid); }catch(_){}
+  if(cancelled){ if(d.dragging){ d.el.classList.remove('dragging'); } layoutAll(); return; }
+  if(!d.moved){ // タップ＝回転
+    if(G.rotate && !d.p.locked) rotatePiece(d.p);
+    return;
+  }
+  if(!d.p.placed && d.dragging){ d.el.classList.remove('dragging'); dropPiece(d.p, e.clientX, e.clientY); }
+  else { layoutAll(); } // 念のため必ず状態どおりに戻す
+}
+function onDocUp(e){ if(drag && e.pointerId===drag.pid) endDrag(e,false); }
+function onDocCancel(e){ if(drag && e.pointerId===drag.pid) endDrag(e,true); }
+
 function attachPointer(el,p){
-  let startX=0,startY=0,offX=0,offY=0,moved=false,dragging=false,pid=null;
-  const TH=8;
   el.addEventListener('pointerdown',e=>{
     if(p.locked) return;
+    if(drag) return; // 同時に1つだけ（複数の指を無視）
     audio();
-    pid=e.pointerId; el.setPointerCapture(pid);
-    startX=e.clientX; startY=e.clientY; moved=false; dragging=false;
-    const r=el.getBoundingClientRect(); offX=e.clientX-r.left; offY=e.clientY-r.top;
-    e.preventDefault();
+    const r=el.getBoundingClientRect();
+    drag={ p, el, pid:e.pointerId, startX:e.clientX, startY:e.clientY,
+      offX:e.clientX-r.left, offY:e.clientY-r.top, moved:false, dragging:false };
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    document.addEventListener('pointermove',onDocMove,{passive:false});
+    document.addEventListener('pointerup',onDocUp);
+    document.addEventListener('pointercancel',onDocCancel);
+    // pointerdown では preventDefault しない（iOSがポインタをcancelするのを避ける）。
+    // スクロール抑制は .piece の touch-action:none と move 側の preventDefault で行う。
   });
-  el.addEventListener('pointermove',e=>{
-    if(pid===null) return;
-    const dx=e.clientX-startX, dy=e.clientY-startY;
-    if(!moved && Math.hypot(dx,dy)>TH) moved=true;
-    if(moved && !p.placed){
-      if(!dragging){ dragging=true; el.classList.add('dragging');
-        el.style.width=G.cellPx+'px'; el.style.height=G.cellPx+'px'; el.style.margin='0'; }
-      el.style.left=(e.clientX-offX)+'px'; el.style.top=(e.clientY-offY)+'px';
-    }
-  });
-  el.addEventListener('pointerup',e=>{
-    if(pid===null) return;
-    try{ el.releasePointerCapture(pid);}catch(_){}
-    pid=null;
-    if(!moved){ // タップ
-      if(G.rotate && !p.locked){ rotatePiece(p); }
-      return;
-    }
-    if(!p.placed && dragging){ dragging=false; el.classList.remove('dragging'); dropPiece(p,e.clientX,e.clientY); }
-  });
-  el.addEventListener('pointercancel',()=>{ pid=null; if(dragging){ el.classList.remove('dragging'); layoutAll(); } });
 }
 
 function rotatePiece(p){
