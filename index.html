@@ -128,6 +128,9 @@
   .spark{ position:absolute; pointer-events:none; font-size:22px; z-index:8000;
     animation:sparkle .7s ease forwards; }
   @keyframes sparkle{ from{ transform:scale(.2); opacity:1 } to{ transform:scale(1.8) translateY(-24px); opacity:0 } }
+
+  .ver{ position:absolute; bottom:14px; left:0; right:0; text-align:center;
+    font-size:13px; font-weight:700; color:var(--purple2); opacity:.6; letter-spacing:.03em; }
 </style>
 </head>
 <body>
@@ -140,6 +143,7 @@
     <h1>しゃしんパズル</h1>
     <p class="sub">すきな しゃしんで あそぼう！</p>
     <button class="btn" id="startBtn">はじめる ▶</button>
+    <p class="ver" id="ver"></p>
   </section>
 
   <!-- しゃしんえらび -->
@@ -200,6 +204,10 @@
 "use strict";
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
+
+/* ---------- バージョン（更新のたびに数字を上げる） ---------- */
+const VERSION = 'ver 1.4 ・ 2026-07-20';
+$('#ver').textContent = VERSION;
 
 /* ---------- ふわふわ背景 ---------- */
 (function(){
@@ -338,7 +346,21 @@ function startGame(L){
 }
 function randRot(){ const opts=[90,180,270]; return opts[Math.floor(Math.random()*opts.length)]; }
 
+function resetGame(){
+  // 前回の内容を片付ける（ドラッグ中・トレイ・盤面・body直下のピースをすべて除去）
+  if(drag){
+    document.removeEventListener('pointermove',onDocMove);
+    document.removeEventListener('pointerup',onDocUp);
+    document.removeEventListener('pointercancel',onDocCancel);
+    drag=null;
+  }
+  $$('.piece').forEach(el=>el.remove());
+  $('#tray').innerHTML='';
+  const hint=$('#dropHint'); if(hint){ hint.style.display='none'; hint.classList.remove('ok'); }
+}
+
 function buildPuzzle(){
+  resetGame();
   G.boardPx=computeBoardPx(); G.cellPx=G.boardPx/G.cols;
   const board=$('#board'); board.style.width=G.boardPx+'px'; board.style.height=G.boardPx+'px';
   $('#guide').style.backgroundImage=`url(${G.photo})`;
