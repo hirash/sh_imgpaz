@@ -206,7 +206,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
 /* ---------- バージョン（更新のたびに数字を上げる） ---------- */
-const VERSION = 'ver 1.4 ・ 2026-07-20';
+const VERSION = 'ver 1.5 ・ 2026-07-20';
 $('#ver').textContent = VERSION;
 
 /* ---------- ふわふわ背景 ---------- */
@@ -288,6 +288,9 @@ const LEVELS=[
   {id:'e', emoji:'🟦', name:'とても かんたん', desc:'しかく 4こ', stars:'⭐', cols:2, rows:2, shape:'square', rotate:false},
   {id:'n', emoji:'🟪', name:'かんたん', desc:'しかく 9こ', stars:'⭐⭐', cols:3, rows:3, shape:'square', rotate:false},
   {id:'t', emoji:'🔺', name:'さんかく', desc:'さんかく 2つで しかく', stars:'⭐⭐⭐', cols:2, rows:2, shape:'tri', rotate:false},
+  {id:'mix', emoji:'🔺🟦', name:'さんかく＆しかく', desc:'まぜまぜ コース', stars:'⭐⭐⭐', cols:2, rows:2, shape:'mix', rotate:false},
+  {id:'c2', emoji:'🌗', name:'はんまる', desc:'はんぶん2つで まる', stars:'⭐⭐⭐', cols:2, rows:2, shape:'circle2', rotate:false},
+  {id:'c4', emoji:'🔵', name:'まんまる', desc:'4つで まん丸', stars:'⭐⭐⭐', cols:1, rows:1, shape:'circle4', rotate:false},
   {id:'r', emoji:'🔄', name:'まわして', desc:'むきを あわせよう', stars:'⭐⭐⭐', cols:3, rows:3, shape:'square', rotate:true},
   {id:'tr', emoji:'🔺🔄', name:'さんかく＆まわす', desc:'いちばん むずかしい', stars:'⭐⭐⭐⭐', cols:2, rows:2, shape:'tri', rotate:true},
 ];
@@ -359,33 +362,52 @@ function resetGame(){
   const hint=$('#dropHint'); if(hint){ hint.style.display='none'; hint.classList.remove('ok'); }
 }
 
+// セルを分割する形（clip-path と 丸かどうか）
+function subSlotsForCell(shape){
+  switch(shape){
+    case 'square': return [{clip:null, circle:false}];
+    case 'tri':    return [{clip:'polygon(0 0,100% 0,100% 100%)'},{clip:'polygon(0 0,100% 100%,0 100%)'}]; // 三角ふたつ
+    case 'circle2':return [{clip:'inset(0 0 50% 0)',circle:true},{clip:'inset(50% 0 0 0)',circle:true}];   // 半円（上下）
+    case 'circle4':return [ // 四分円（4つでまん丸）
+      {clip:'inset(0 50% 50% 0)',circle:true},{clip:'inset(0 0 50% 50%)',circle:true},
+      {clip:'inset(50% 50% 0 0)',circle:true},{clip:'inset(50% 0 0 50%)',circle:true}];
+    default: return [{clip:null,circle:false}];
+  }
+}
+// 各セルの形を決める（mix は三角と四角をまぜる）
+function makeCellShapes(){
+  const n=G.cols*G.rows;
+  if(G.shape!=='mix') return Array(n).fill(G.shape);
+  const triCount=Math.max(1, Math.min(n-1, Math.round(n/2)));
+  const arr=[]; for(let i=0;i<n;i++) arr.push(i<triCount?'tri':'square');
+  return shuffle(arr);
+}
+
 function buildPuzzle(){
   resetGame();
   G.boardPx=computeBoardPx(); G.cellPx=G.boardPx/G.cols;
   const board=$('#board'); board.style.width=G.boardPx+'px'; board.style.height=G.boardPx+'px';
   $('#guide').style.backgroundImage=`url(${G.photo})`;
-  drawGrid();
 
   G.slots=[]; G.pieces=[]; G.solved=0;
   const cell=G.cellPx;
+  G.cellShapes = makeCellShapes();
+  let ci=0;
   for(let r=0;r<G.rows;r++){
     for(let c=0;c<G.cols;c++){
-      const x=c*cell, y=r*cell;
-      if(G.shape==='square'){
-        G.slots.push({x,y, cx:x+cell/2, cy:y+cell/2});
-      } else {
-        // 三角ふたつ（左上-右下の対角線でわける）
-        G.slots.push({x,y, cx:x+cell/2, cy:y+cell/2, clip:'polygon(0 0,100% 0,100% 100%)'});
-        G.slots.push({x,y, cx:x+cell/2, cy:y+cell/2, clip:'polygon(0 0,100% 100%,0 100%)'});
-      }
+      const x=c*cell, y=r*cell; const cs=G.cellShapes[ci++];
+      subSlotsForCell(cs).forEach(sub=>{
+        G.slots.push({x,y, cx:x+cell/2, cy:y+cell/2, clip:sub.clip||null, circle:!!sub.circle});
+      });
     }
   }
+  drawGrid();
   // ピースをつくる
   G.slots.forEach((slot,i)=>{
     const col=Math.round(slot.x/cell), row=Math.round(slot.y/cell);
     const p={ id:i, slotId:i, placed:false, locked:false,
       rotation: G.rotate ? randRot() : 0, correctRot:0,
-      bgX:-col*cell, bgY:-row*cell, clip:slot.clip||null };
+      bgX:-col*cell, bgY:-row*cell, clip:slot.clip||null, circle:slot.circle };
     p.el=buildPieceEl(p);
     G.pieces.push(p);
   });
@@ -398,12 +420,13 @@ function buildPuzzle(){
 
 function buildPieceEl(p){
   const el=document.createElement('div');
-  el.className='piece '+(p.clip?'tri':'square');
+  el.className='piece '+(p.clip?'clip':'square');
   el.style.width=G.cellPx+'px'; el.style.height=G.cellPx+'px';
   el.style.backgroundImage=`url(${G.photo})`;
   el.style.backgroundSize=`${G.boardPx}px ${G.boardPx}px`;
   el.style.backgroundPosition=`${p.bgX}px ${p.bgY}px`;
   if(p.clip) el.style.clipPath=p.clip;
+  if(p.circle) el.style.borderRadius='50%'; // 丸ピース
   el.style.setProperty('--rot',`rotate(${p.rotation}deg)`);
   el.style.transform=`rotate(${p.rotation}deg)`;
   attachPointer(el,p);
@@ -412,18 +435,27 @@ function buildPieceEl(p){
 
 function drawGrid(){
   const n=G.boardPx, cell=G.cellPx;
-  let lines='';
+  let lines='', circles='';
+  // マスの区切り線
   for(let i=0;i<=G.cols;i++){ const x=i*cell; lines+=`<line x1="${x}" y1="0" x2="${x}" y2="${n}"/>`; }
   for(let i=0;i<=G.rows;i++){ const y=i*cell; lines+=`<line x1="0" y1="${y}" x2="${n}" y2="${y}"/>`; }
-  if(G.shape==='tri'){
-    for(let r=0;r<G.rows;r++) for(let c=0;c<G.cols;c++){
-      lines+=`<line x1="${c*cell}" y1="${r*cell}" x2="${(c+1)*cell}" y2="${(r+1)*cell}"/>`;
+  // セルごとの分割線・丸
+  const shapes=G.cellShapes||[]; let ci=0;
+  for(let r=0;r<G.rows;r++) for(let c=0;c<G.cols;c++){
+    const cs=shapes[ci++]||G.shape;
+    const x=c*cell, y=r*cell, cx=x+cell/2, cy=y+cell/2, rad=cell/2*0.92;
+    if(cs==='tri'){
+      lines+=`<line x1="${x}" y1="${y}" x2="${x+cell}" y2="${y+cell}"/>`; // 対角線
+    } else if(cs==='circle2' || cs==='circle4'){
+      circles+=`<circle cx="${cx}" cy="${cy}" r="${rad}"/>`;
+      lines+=`<line x1="${cx-rad}" y1="${cy}" x2="${cx+rad}" y2="${cy}"/>`;            // 横の直径
+      if(cs==='circle4') lines+=`<line x1="${cx}" y1="${cy-rad}" x2="${cx}" y2="${cy+rad}"/>`; // 縦の直径
     }
   }
   $('#grid').innerHTML=
     `<svg width="${n}" height="${n}" viewBox="0 0 ${n} ${n}" style="overflow:visible">
       <g fill="none" stroke="var(--line)" stroke-width="3" stroke-linecap="round"
-         stroke-dasharray="2 10" opacity=".8">${lines}</g>
+         stroke-dasharray="2 10" opacity=".8">${lines}${circles}</g>
     </svg>`;
 }
 
@@ -632,15 +664,15 @@ window.addEventListener('resize',()=>{
     const snap=G.pieces.map(p=>({placed:p.placed,locked:p.locked,rotation:p.rotation}));
     G.boardPx=np; G.cellPx=np/G.cols;
     const board=$('#board'); board.style.width=np+'px'; board.style.height=np+'px';
-    drawGrid();
-    // slots 再計算
-    const cell=G.cellPx; let si=0; G.slots=[];
+    // slots 再計算（セル形状は維持）
+    const cell=G.cellPx; G.slots=[]; let ci=0;
     for(let r=0;r<G.rows;r++) for(let c=0;c<G.cols;c++){
-      const x=c*cell,y=r*cell;
-      if(G.shape==='square') G.slots.push({x,y,cx:x+cell/2,cy:y+cell/2});
-      else{ G.slots.push({x,y,cx:x+cell/2,cy:y+cell/2,clip:'polygon(0 0,100% 0,100% 100%)'});
-            G.slots.push({x,y,cx:x+cell/2,cy:y+cell/2,clip:'polygon(0 0,100% 100%,0 100%)'}); }
+      const x=c*cell,y=r*cell; const cs=(G.cellShapes||[])[ci++]||G.shape;
+      subSlotsForCell(cs).forEach(sub=>{
+        G.slots.push({x,y,cx:x+cell/2,cy:y+cell/2,clip:sub.clip||null,circle:!!sub.circle});
+      });
     }
+    drawGrid();
     G.pieces.forEach((p,i)=>{
       const s=G.slots[p.slotId]; const col=Math.round(s.x/cell), row=Math.round(s.y/cell);
       p.bgX=-col*cell; p.bgY=-row*cell;
