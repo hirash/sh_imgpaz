@@ -31,6 +31,9 @@
   .screen{ position:absolute; inset:0; display:none; flex-direction:column;
     align-items:center; justify-content:center; padding:16px; text-align:center; }
   .screen.on{ display:flex; animation:pop .35s ease; }
+  /* 内容が縦にあふれる画面はスクロールできるように（見切れ防止） */
+  #s-photo, #s-level{ justify-content:flex-start; overflow-y:auto; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:24px 16px 32px; }
   @keyframes pop{ from{ transform:scale(.92); opacity:0 } to{ transform:scale(1); opacity:1 } }
 
   h1{ font-size:clamp(30px,7vw,56px); margin:.1em 0; color:var(--pink2);
@@ -206,7 +209,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
 /* ---------- バージョン（更新のたびに数字を上げる） ---------- */
-const VERSION = 'ver 1.5 ・ 2026-07-20';
+const VERSION = 'ver 1.6 ・ 2026-07-20';
 $('#ver').textContent = VERSION;
 
 /* ---------- ふわふわ背景 ---------- */
