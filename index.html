@@ -94,8 +94,17 @@
   .piece{ position:relative; background-repeat:no-repeat; cursor:grab;
     filter:drop-shadow(0 3px 3px rgba(120,70,160,.35)); touch-action:none; z-index:2; }
   .piece.square{ border-radius:8px; }
-  .piece.dragging{ position:fixed; z-index:9999; cursor:grabbing; filter:drop-shadow(0 8px 10px rgba(120,70,160,.45)); }
+  .piece.dragging{ position:fixed; z-index:9999; cursor:grabbing; opacity:.94;
+    filter:drop-shadow(0 14px 16px rgba(120,70,160,.55)); }
   .piece.placed{ z-index:3; }
+  /* ドロップ先（運んでいるマス）を光らせる */
+  .dropHint{ position:absolute; border-radius:12px; pointer-events:none; z-index:2; display:none;
+    background:rgba(180,140,255,.18);
+    box-shadow:0 0 0 4px rgba(180,140,255,.7), 0 0 22px rgba(180,140,255,.55);
+    animation:hintpulse .9s ease-in-out infinite; }
+  .dropHint.ok{ background:rgba(120,220,160,.24);
+    box-shadow:0 0 0 5px rgba(70,205,130,.85), 0 0 26px rgba(70,205,130,.6); }
+  @keyframes hintpulse{ 0%,100%{ transform:scale(1) } 50%{ transform:scale(1.04) } }
   .piece.locked{ filter:drop-shadow(0 2px 2px rgba(120,70,160,.25)); cursor:default; }
   .piece.wiggle{ animation:wig .4s ease; }
   @keyframes wig{ 0%,100%{transform:var(--rot)} 25%{transform:var(--rot) translateX(-4px)} 75%{transform:var(--rot) translateX(4px)} }
@@ -165,6 +174,7 @@
       <div class="board" id="board">
         <div class="guide" id="guide"></div>
         <div class="grid" id="grid"></div>
+        <div class="dropHint" id="dropHint"></div>
       </div>
     </div>
     <div class="tray" id="tray"></div>
@@ -430,14 +440,37 @@ function layoutAll(){
 const TH=8;
 let drag=null; // {p, el, pid, startX, startY, offX, offY, moved, dragging}
 
+// 運んでいる位置＝指より少し上（指で隠れないように浮かせる）
+function carryPoint(e){ return { x:e.clientX, y:e.clientY - Math.min(G.cellPx*0.55,100) }; }
+
+function updateDropHint(cx,cy,p){
+  const hint=$('#dropHint'); const b=$('#board').getBoundingClientRect(); const cell=G.cellPx;
+  const bx=cx-b.left, by=cy-b.top;
+  if(bx<0||by<0||bx>=G.boardPx||by>=G.boardPx){ hint.style.display='none'; return; }
+  const col=Math.floor(bx/cell), row=Math.floor(by/cell);
+  hint.style.display='block';
+  hint.style.left=(col*cell)+'px'; hint.style.top=(row*cell)+'px';
+  hint.style.width=cell+'px'; hint.style.height=cell+'px';
+  const s=G.slots[p.slotId]; const tcol=Math.round(s.x/cell), trow=Math.round(s.y/cell);
+  hint.classList.toggle('ok', col===tcol && row===trow); // 正しいマスは緑
+}
+
 function onDocMove(e){
   if(!drag || e.pointerId!==drag.pid) return;
   const dx=e.clientX-drag.startX, dy=e.clientY-drag.startY;
   if(!drag.moved && Math.hypot(dx,dy)>TH) drag.moved=true;
   if(drag.moved && !drag.p.placed){
     if(!drag.dragging){ drag.dragging=true; drag.el.classList.add('dragging');
-      drag.el.style.width=G.cellPx+'px'; drag.el.style.height=G.cellPx+'px'; drag.el.style.margin='0'; }
-    drag.el.style.left=(e.clientX-drag.offX)+'px'; drag.el.style.top=(e.clientY-drag.offY)+'px';
+      // body直下へ移して position:fixed をインラインで明示
+      // （layoutAll が付けた position:relative や祖先の transform に負けないように）
+      document.body.appendChild(drag.el);
+      drag.el.style.position='fixed';
+      drag.el.style.width=G.cellPx+'px'; drag.el.style.height=G.cellPx+'px'; drag.el.style.margin='0';
+      drag.el.style.transform=`rotate(${drag.p.rotation}deg) scale(1.08)`; }
+    const c=carryPoint(e);
+    drag.el.style.left=(c.x - G.cellPx/2)+'px';
+    drag.el.style.top =(c.y - G.cellPx/2)+'px';
+    updateDropHint(c.x, c.y, drag.p);
     if(e.cancelable) e.preventDefault();
   }
 }
@@ -448,12 +481,13 @@ function endDrag(e,cancelled){
   document.removeEventListener('pointerup',onDocUp);
   document.removeEventListener('pointercancel',onDocCancel);
   try{ d.el.releasePointerCapture(d.pid); }catch(_){}
+  $('#dropHint').style.display='none';
   if(cancelled){ if(d.dragging){ d.el.classList.remove('dragging'); } layoutAll(); return; }
   if(!d.moved){ // タップ＝回転
     if(G.rotate && !d.p.locked) rotatePiece(d.p);
     return;
   }
-  if(!d.p.placed && d.dragging){ d.el.classList.remove('dragging'); dropPiece(d.p, e.clientX, e.clientY); }
+  if(!d.p.placed && d.dragging){ d.el.classList.remove('dragging'); const c=carryPoint(e); dropPiece(d.p, c.x, c.y); }
   else { layoutAll(); } // 念のため必ず状態どおりに戻す
 }
 function onDocUp(e){ if(drag && e.pointerId===drag.pid) endDrag(e,false); }
@@ -487,11 +521,12 @@ function rotatePiece(p){
 }
 
 function dropPiece(p,px,py){
-  const b=$('#board').getBoundingClientRect();
-  const s=G.slots[p.slotId];
-  const targetX=b.left+s.cx, targetY=b.top+s.cy;
-  const dist=Math.hypot(px - targetX, py - targetY);
-  if(dist < G.cellPx*0.6){
+  const b=$('#board').getBoundingClientRect(); const cell=G.cellPx;
+  const bx=px-b.left, by=py-b.top;
+  const inBoard = bx>=0 && by>=0 && bx<G.boardPx && by<G.boardPx;
+  const col=Math.floor(bx/cell), row=Math.floor(by/cell);
+  const s=G.slots[p.slotId]; const tcol=Math.round(s.x/cell), trow=Math.round(s.y/cell);
+  if(inBoard && col===tcol && row===trow){ // 正しいマス（光っていたマス）に落とせばOK
     p.placed=true;
     layoutAll();
     sfx.pop();
