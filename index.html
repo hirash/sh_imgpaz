@@ -166,6 +166,8 @@
 
   .ver{ position:absolute; bottom:14px; left:0; right:0; text-align:center;
     font-size:13px; font-weight:700; color:var(--purple2); opacity:.6; letter-spacing:.03em; }
+  .ricon{ display:inline-block; width:18px; height:18px; vertical-align:-3px; margin-right:6px;
+    background-size:contain; background-repeat:no-repeat; background-position:center; }
 </style>
 </head>
 <body>
@@ -179,6 +181,7 @@
     <h1>しゃしんパズル</h1>
     <p class="sub">すきな しゃしんで あそぼう！</p>
     <button class="btn" id="startBtn">はじめる ▶</button>
+    <button class="btn ghost small" id="reloadBtn" style="margin-top:14px;"><span class="ricon" id="ricon"></span>さいしんに する</button>
     <p class="ver" id="ver"></p>
   </section>
 
@@ -257,7 +260,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
 /* ---------- バージョン（更新のたびに数字を上げる） ---------- */
-const VERSION = 'ver 2.1 ・ 2026-07-22';
+const VERSION = 'ver 2.2 ・ 2026-07-22';
 $('#ver').textContent = VERSION;
 
 /* ---------- 装飾の図形（絵文字を使わずSVGで描く：どの端末でも必ず表示） ---------- */
@@ -800,6 +803,9 @@ function confetti(n=60){
 /* ---------- ボタン配線 ---------- */
 function goLevels(){ buildLevels(); show('s-level'); }
 $('#startBtn').onclick=()=>{ audio(); openPhotoScreen(); };
+// さいしんに する：キャッシュを避けて最新のページを読み込む（URLに時刻を付与）
+$('#ricon').style.backgroundImage=`url("${svgURI('<g fill=\'none\' stroke=\'#9a6bff\' stroke-width=\'2.6\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><path d=\'M20 12a8 8 0 1 1-2.3-5.6\'/><path d=\'M20 4v4h-4\'/></g>')}")`;
+$('#reloadBtn').onclick=()=>{ location.replace(location.href.split('?')[0].split('#')[0] + '?v=' + Date.now()); };
 $('#settingsBtn').onclick=()=>{ audio(); buildSettings(); show('s-settings'); };
 $('#settingsDone').onclick=()=>show('s-title');
 $('#backToTitle').onclick=()=>show('s-title');
