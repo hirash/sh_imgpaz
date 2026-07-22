@@ -129,26 +129,28 @@
 
   /* おいわい */
   #win{ background:rgba(255,255,255,.55); backdrop-filter:blur(3px); z-index:9600; }
-  .winCard{ background:#fff; border-radius:30px; padding:30px 26px; max-width:90vw;
+  .winCard{ background:#fff; border-radius:30px; padding:20px 20px 24px; max-width:94vw;
     box-shadow:0 16px 40px rgba(180,120,220,.45); animation:popIn .5s cubic-bezier(.34,1.56,.64,1); }
   @keyframes popIn{ from{ transform:scale(.6) rotate(-6deg); opacity:0 } to{ transform:scale(1); opacity:1 } }
-  /* おいわい：完成した絵を出すバースト演出 */
-  .winBurst{ position:relative; width:190px; height:190px; margin:2px auto 10px;
-    display:flex; align-items:center; justify-content:center; }
-  .rays{ position:absolute; width:280px; height:280px; border-radius:50%;
-    background:repeating-conic-gradient(from 0deg, rgba(255,214,107,.55) 0 10deg, rgba(255,255,255,0) 10deg 20deg);
-    -webkit-mask:radial-gradient(circle, #000 34%, rgba(0,0,0,.25) 55%, transparent 72%);
-            mask:radial-gradient(circle, #000 34%, rgba(0,0,0,.25) 55%, transparent 72%);
+  .winCard h1{ font-size:clamp(20px,4.4vw,30px); margin:2px 0; }
+  .winCard .sub{ font-size:clamp(13px,3vw,17px); margin-bottom:14px; }
+  /* おいわい：完成した絵を大きく出すバースト演出 */
+  .winBurst{ position:relative; width:clamp(210px,62vw,340px); height:clamp(210px,62vw,340px);
+    margin:2px auto 8px; display:flex; align-items:center; justify-content:center; }
+  .rays{ position:absolute; width:150%; height:150%; left:-25%; top:-25%; border-radius:50%;
+    background:repeating-conic-gradient(from 0deg, rgba(255,214,107,.6) 0 9deg, rgba(255,255,255,0) 9deg 18deg);
+    -webkit-mask:radial-gradient(circle, #000 30%, rgba(0,0,0,.22) 55%, transparent 72%);
+            mask:radial-gradient(circle, #000 30%, rgba(0,0,0,.22) 55%, transparent 72%);
     animation:spin 9s linear infinite; }
   @keyframes spin{ to{ transform:rotate(360deg) } }
-  .winImg{ position:relative; z-index:1; width:150px; height:150px; border-radius:24px;
-    border:6px solid #fff; background-size:cover; background-position:center;
-    box-shadow:0 10px 24px rgba(180,120,220,.45); animation:tadaPop .7s cubic-bezier(.34,1.56,.64,1); }
+  .winImg{ position:relative; z-index:1; width:100%; height:100%; border-radius:28px;
+    border:7px solid #fff; background-size:cover; background-position:center;
+    box-shadow:0 12px 28px rgba(180,120,220,.45); animation:tadaPop .7s cubic-bezier(.34,1.56,.64,1); }
   @keyframes tadaPop{ 0%{transform:scale(.2) rotate(-18deg); opacity:0} 60%{transform:scale(1.12) rotate(6deg); opacity:1} 100%{transform:scale(1) rotate(0)} }
   .confetti{ position:fixed; inset:0; pointer-events:none; z-index:9700; overflow:hidden; }
-  .confetti span{ position:absolute; top:-40px; background-repeat:no-repeat; background-size:contain;
+  .confetti span{ position:absolute; top:-50px; background-repeat:no-repeat; background-size:contain;
     animation:fall linear forwards; }
-  @keyframes fall{ to{ transform:translateY(115vh) rotate(540deg); opacity:.9 } }
+  @keyframes fall{ to{ transform:translateY(118vh) rotate(720deg); opacity:.85 } }
 
   .spark{ position:absolute; pointer-events:none; font-size:22px; z-index:8000;
     animation:sparkle .7s ease forwards; }
@@ -221,7 +223,7 @@
       <div class="rays"></div>
       <div class="winImg" id="winImg"></div>
     </div>
-    <h1 style="font-size:clamp(28px,6vw,48px)">パンパカパーン！</h1>
+    <h1>パンパカパーン！</h1>
     <p class="sub" id="winMsg">できたね！</p>
     <div class="row">
       <button class="btn" id="winAgain">🔀 もういちど</button>
@@ -238,7 +240,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
 /* ---------- バージョン（更新のたびに数字を上げる） ---------- */
-const VERSION = 'ver 1.9 ・ 2026-07-20';
+const VERSION = 'ver 2.0 ・ 2026-07-20';
 $('#ver').textContent = VERSION;
 
 /* ---------- 装飾の図形（絵文字を使わずSVGで描く：どの端末でも必ず表示） ---------- */
@@ -740,16 +742,19 @@ function winGame(){
     const msgs=['すごい！ かんぺき！','じょうずに できたね！','てんさい！','よく がんばったね！'];
     $('#winMsg').textContent=msgs[Math.floor(Math.random()*msgs.length)];
     $('#win').classList.add('on');
-    confetti();
+    // いろいろ降ってくる！何度も派手に
+    confetti(80);
+    [400,850,1400,2000].forEach(t=>setTimeout(()=>{ if($('#win').classList.contains('on')) confetti(55); }, t));
   },420);
 }
-function confetti(){
+function confetti(n=60){
   const c=$('#confetti');
-  for(let i=0;i<44;i++){
-    const s=document.createElement('span'); setShape(s, 16+Math.random()*22);
+  for(let i=0;i<n;i++){
+    const s=document.createElement('span'); setShape(s, 14+Math.random()*30);   // 大小いろいろ
     s.style.left=(Math.random()*100)+'vw';
-    s.style.animationDuration=(2.2+Math.random()*2.2)+'s'; s.style.animationDelay=(Math.random()*0.6)+'s';
-    c.appendChild(s); setTimeout(()=>s.remove(),5200);
+    s.style.animationDuration=(1.6+Math.random()*2.4)+'s'; s.style.animationDelay=(Math.random()*0.5)+'s';
+    s.style.opacity=(0.75+Math.random()*0.25);
+    c.appendChild(s); setTimeout(()=>s.remove(),5000);
   }
 }
 
