@@ -32,7 +32,7 @@
     align-items:center; justify-content:center; padding:16px; text-align:center; }
   .screen.on{ display:flex; animation:pop .35s ease; }
   /* 内容が縦にあふれる画面はスクロールできるように（見切れ防止） */
-  #s-photo, #s-level{ justify-content:flex-start; overflow-y:auto; overflow-x:hidden;
+  #s-photo, #s-level, #s-settings{ justify-content:flex-start; overflow-y:auto; overflow-x:hidden;
     -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:24px 16px 32px; }
   @keyframes pop{ from{ transform:scale(.92); opacity:0 } to{ transform:scale(1); opacity:1 } }
 
@@ -77,14 +77,22 @@
   /* レベルえらび */
   .levels{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
     gap:14px; width:min(680px,94vw); margin:8px 0 20px; }
-  .level{ background:#fff; border:none; cursor:pointer; border-radius:22px; padding:18px 12px;
+  .level{ position:relative; background:#fff; border:none; cursor:pointer; border-radius:22px; padding:18px 12px;
     box-shadow:0 6px 0 #ecdcff,0 10px 20px rgba(180,140,255,.25); font-family:inherit;
-    transition:transform .1s; }
+    transition:transform .1s, opacity .15s; }
   .level:active{ transform:translateY(3px); box-shadow:0 3px 0 #ecdcff; }
   .level .emoji{ font-size:40px; display:block; }
   .level .name{ font-size:21px; font-weight:800; color:var(--purple2); margin-top:4px; }
   .level .desc{ font-size:13px; color:var(--grape); margin-top:2px; }
   .level .stars{ color:var(--yellow); font-size:16px; }
+  /* せってい用：オン/オフのチェック */
+  .level .check{ position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%;
+    background:#4fcf82; box-shadow:inset 0 0 0 2px #fff; }
+  .level .check::after{ content:''; position:absolute; left:9px; top:5px; width:6px; height:11px;
+    border:solid #fff; border-width:0 3px 3px 0; transform:rotate(45deg); }
+  .level.off{ opacity:.5; filter:grayscale(.55); }
+  .level.off .check{ background:#c9b8e6; }
+  .level.off .check::after{ display:none; }
 
   /* ゲームがめん */
   #game{ display:flex; flex-direction:column; padding:0; }
@@ -166,11 +174,20 @@
 <div id="app">
   <!-- タイトル -->
   <section class="screen on" id="s-title">
+    <button class="btn ghost small" id="settingsBtn" style="position:absolute;top:14px;right:14px;padding:8px 16px;">せってい</button>
     <div style="font-size:64px">🧩🌸</div>
     <h1>しゃしんパズル</h1>
     <p class="sub">すきな しゃしんで あそぼう！</p>
     <button class="btn" id="startBtn">はじめる ▶</button>
     <p class="ver" id="ver"></p>
+  </section>
+
+  <!-- せってい：ひょうじするレベル -->
+  <section class="screen" id="s-settings">
+    <h1 style="font-size:clamp(22px,5vw,36px)">ひょうじ する レベル</h1>
+    <p class="sub">あそぶ レベルを えらんでね（タップで オン・オフ）</p>
+    <div class="levels" id="settingsLevels"></div>
+    <button class="btn" id="settingsDone">できた ▶</button>
   </section>
 
   <!-- しゃしんえらび -->
@@ -240,7 +257,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
 /* ---------- バージョン（更新のたびに数字を上げる） ---------- */
-const VERSION = 'ver 2.0 ・ 2026-07-20';
+const VERSION = 'ver 2.1 ・ 2026-07-22';
 $('#ver').textContent = VERSION;
 
 /* ---------- 装飾の図形（絵文字を使わずSVGで描く：どの端末でも必ず表示） ---------- */
@@ -421,13 +438,35 @@ function renderHistory(){
 }
 function openPhotoScreen(){ buildSamples(); renderHistory(); show('s-photo'); }
 
+/* ---------- 表示するレベルの設定（localStorage に保存） ---------- */
+const LKEY='shimgpaz_levels_v1';
+function loadEnabled(){ try{ const a=JSON.parse(localStorage.getItem(LKEY)); if(Array.isArray(a)) return new Set(a); }catch(e){} return new Set(LEVELS.map(L=>L.id)); }
+function saveEnabled(set){ try{ localStorage.setItem(LKEY, JSON.stringify([...set])); }catch(e){} }
+
 function buildLevels(){
   const wrap=$('#levels'); wrap.innerHTML='';
-  LEVELS.forEach(L=>{
+  const en=loadEnabled();
+  let list=LEVELS.filter(L=>en.has(L.id));
+  if(!list.length) list=LEVELS.slice();   // 全部オフなら念のため全部出す
+  list.forEach(L=>{
     const b=document.createElement('button'); b.className='level';
     b.innerHTML=`<span class="emoji">${L.emoji}</span><span class="name">${L.name}</span>
       <span class="desc">${L.desc}</span><br><span class="stars">${L.stars}</span>`;
     b.onclick=()=>{ audio(); startGame(L); };
+    wrap.appendChild(b);
+  });
+}
+
+function buildSettings(){
+  const wrap=$('#settingsLevels'); wrap.innerHTML='';
+  const en=loadEnabled();
+  LEVELS.forEach(L=>{
+    const b=document.createElement('button'); b.className='level'+(en.has(L.id)?'':' off');
+    b.innerHTML=`<span class="check"></span><span class="emoji">${L.emoji}</span><span class="name">${L.name}</span>
+      <span class="desc">${L.desc}</span><br><span class="stars">${L.stars}</span>`;
+    b.onclick=()=>{ audio(); const s=loadEnabled();
+      if(s.has(L.id)) s.delete(L.id); else s.add(L.id);
+      saveEnabled(s); b.classList.toggle('off', !s.has(L.id)); };
     wrap.appendChild(b);
   });
 }
@@ -761,6 +800,8 @@ function confetti(n=60){
 /* ---------- ボタン配線 ---------- */
 function goLevels(){ buildLevels(); show('s-level'); }
 $('#startBtn').onclick=()=>{ audio(); openPhotoScreen(); };
+$('#settingsBtn').onclick=()=>{ audio(); buildSettings(); show('s-settings'); };
+$('#settingsDone').onclick=()=>show('s-title');
 $('#backToTitle').onclick=()=>show('s-title');
 $('#backToPhoto').onclick=()=>openPhotoScreen();
 $('#cameraBtn').onclick=()=>$('#fileInput').click();
