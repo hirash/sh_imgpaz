@@ -118,13 +118,13 @@
   .hidden{ display:none !important; }
 
   /* おいわい */
-  #win{ background:rgba(255,255,255,.55); backdrop-filter:blur(3px); }
+  #win{ background:rgba(255,255,255,.55); backdrop-filter:blur(3px); z-index:9600; }
   .winCard{ background:#fff; border-radius:30px; padding:30px 26px; max-width:90vw;
     box-shadow:0 16px 40px rgba(180,120,220,.45); animation:popIn .5s cubic-bezier(.34,1.56,.64,1); }
   @keyframes popIn{ from{ transform:scale(.6) rotate(-6deg); opacity:0 } to{ transform:scale(1); opacity:1 } }
   .winCard .prize{ font-size:70px; animation:tada 1s ease infinite; }
   @keyframes tada{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.12) rotate(4deg)} }
-  .confetti{ position:fixed; inset:0; pointer-events:none; z-index:9000; overflow:hidden; }
+  .confetti{ position:fixed; inset:0; pointer-events:none; z-index:9700; overflow:hidden; }
   .confetti span{ position:absolute; top:-30px; font-size:26px; animation:fall linear forwards; }
   @keyframes fall{ to{ transform:translateY(110vh) rotate(540deg); opacity:.9 } }
 
@@ -209,7 +209,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
 /* ---------- バージョン（更新のたびに数字を上げる） ---------- */
-const VERSION = 'ver 1.6 ・ 2026-07-20';
+const VERSION = 'ver 1.7 ・ 2026-07-20';
 $('#ver').textContent = VERSION;
 
 /* ---------- ふわふわ背景 ---------- */
